@@ -1,4 +1,8 @@
+// AgriShield — interaction layer, no dependencies
 
+/* ============================================================
+   1. TRANSLATIONS
+   ============================================================ */
 const translations = {
   en: {
     "a11y.skip": "Skip to content",
@@ -83,6 +87,40 @@ const translations = {
     "train.list.delete": "Remove",
     "train.added": "Added to your training set.",
     "train.cleared": "Training data cleared.",
+    "train.list.resetNote": "This clears both single photos added above and any uploaded dataset.",
+
+    "train.dataset.or": "or",
+    "train.dataset.heading": "Upload a full training dataset (.zip)",
+    "train.dataset.hint": "Two zip formats are supported and detected automatically. YOLOv8 / Roboflow export: a data.yaml file plus train/valid/test folders, each with an images/ and labels/ subfolder of matching .txt annotations — images already auto-oriented (EXIF stripped) and resized to 640×640 are read natively. Simple folder export: zip it as Crop/Disease/photo.jpg — one top-level folder per crop, a subfolder per disease, images inside, with an optional notes.txt per disease folder for treatment notes.",
+    "train.dataset.label": "Dataset .zip file",
+    "train.dataset.limit": "Max file size 2 GB. Everything is unzipped, parsed and diagnosed right here in your browser — the file is never uploaded to a server. Large datasets are sampled evenly across classes to keep the browser responsive.",
+    "train.dataset.submit": "Upload dataset",
+    "train.dataset.clear": "Remove uploaded dataset",
+    "train.dataset.reading": "Reading zip file…",
+    "train.dataset.readingLabels": "Reading labels: {n} / {t}",
+    "train.dataset.tooLarge": "That file is too large — the limit for a dataset upload is 2 GB.",
+    "train.dataset.notZip": "Please choose a .zip file.",
+    "train.dataset.noImages": "No images found in that zip. Use Crop/Disease/photo.jpg, or a YOLOv8 export with data.yaml plus images/ and labels/ folders.",
+    "train.dataset.libFail": "Could not load the zip reader — check your connection and try again.",
+    "train.dataset.done": "Added {n} images from your dataset.",
+    "train.dataset.truncated": "Only the first {n} images from this zip were used, to keep the browser responsive.",
+    "train.dataset.doneYolo": "Processed {n} images across {c} classes from your YOLOv8 dataset.",
+    "train.dataset.sampledNote": " Your dataset had {t} images — an even sample per class was used to keep the browser responsive.",
+    "train.dataset.summary": "{n} images stored in this browser from your uploaded dataset(s).",
+    "train.dataset.empty": "No dataset uploaded yet.",
+    "train.dataset.removed": "Uploaded dataset removed.",
+    "train.dataset.upgraded": "The matching engine was upgraded for accuracy — please re-upload your dataset so it's rebuilt with the new fingerprint.",
+    "train.dataset.formatYolo": "YOLOv8 format detected",
+    "train.dataset.formatFolder": "Folder-structured dataset",
+    "train.dataset.preprocBadge": "Auto-oriented · resized 640×640",
+    "train.dataset.statTotal": "Images in dataset",
+    "train.dataset.statProcessed": "Images processed here",
+    "train.dataset.statClasses": "Classes detected",
+    "train.dataset.statSampling": "Sampling",
+    "train.dataset.statSampled": "Evenly sampled per class",
+    "diagnose.source.dataset": "Matched against an image from your uploaded dataset.",
+    "diagnose.source.yolo": "Matched against a YOLOv8-annotated image from your uploaded dataset.",
+    "diagnose.detectionsCount": "{n} object(s) were annotated on the closest matching training image.",
 
     "diagnose.heading": "Diagnose a crop photo",
     "diagnose.form.image": "Photo to diagnose",
@@ -427,7 +465,14 @@ function getStoredLanguage() {
   }
 }
 
+/* ============================================================
+   2. TRAIN / DIAGNOSE DEMO (in-browser, no backend)
+   ============================================================ */
 const TRAIN_KEY = "agrishield_training_v1";
+
+// Small built-in reference set so diagnosis works even with no user data.
+// Colors are rough average-RGB fingerprints used only for this demo's
+// nearest-neighbour matching — not a real trained model.
 const BUILTIN_DATA = [
   { crop: "Cotton", label: "Pink bollworm damage", notes: "Remove and destroy affected bolls; install pheromone traps; consult your Krishi Sahayak before spraying.", color: [178, 140, 108] },
   { crop: "Grapes", label: "Downy mildew", notes: "Remove affected leaves; apply a copper-based spray; improve canopy airflow.", color: [150, 168, 92] },
@@ -460,11 +505,35 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function averageColorFromDataUrl(dataUrl) {
+function averageColorFromDataUrl(dataUrl) { return computeFingerprintFromDataUrl(dataUrl); }
+
+// Spatial color fingerprint used for nearest-neighbour matching in this demo.
+//
+// IMPORTANT: earlier versions of this file reduced an entire photo to a
+// single flat average RGB triplet (3 numbers). That is why diagnosis kept
+// returning the same crop/disease regardless of the uploaded photo: nearly
+// every leaf photo's *overall* average color is some shade of green/brown,
+// so almost all 21,000+ dataset images ended up clustered on top of each
+// other in that 3-number space, and one entry near the centre of that
+// cluster won the "nearest neighbour" search for almost every query photo.
+// Disease symptoms (spots, lesions, discoloration) are usually a small part
+// of the frame and get washed out by a single whole-image average.
+//
+// Splitting the photo into an FP_GRID x FP_GRID grid and averaging each
+// cell separately keeps this a cheap, dependency-free, in-browser
+// computation, but gives a much higher-dimensional, far less degenerate
+// fingerprint (FP_LEN numbers instead of 3) that actually reflects *where*
+// in the photo the color differs — which is what nearest-neighbour matching
+// needs to tell similar-looking diseases apart.
+const FP_GRID = 4;                 // 4x4 = 16 regions sampled per photo
+const FP_LEN = 3 * FP_GRID * FP_GRID; // 48 numbers per fingerprint
+const FINGERPRINT_VERSION = 2;     // bump this if the fingerprint shape ever changes again
+
+function computeFingerprintFromDataUrl(dataUrl) {
   return new Promise(function (resolve, reject) {
     const img = new Image();
     img.onload = function () {
-      const size = 40;
+      const size = 40; // sample canvas — same cost as the old single-average version
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
@@ -477,24 +546,819 @@ function averageColorFromDataUrl(dataUrl) {
         reject(e);
         return;
       }
-      let r = 0, g = 0, b = 0, count = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        r += data[i]; g += data[i + 1]; b += data[i + 2];
-        count++;
+
+      const cell = size / FP_GRID;
+      const cellCount = FP_GRID * FP_GRID;
+      const sums = new Array(cellCount * 3).fill(0);
+      const counts = new Array(cellCount).fill(0);
+
+      for (let y = 0; y < size; y++) {
+        const cy = Math.min(FP_GRID - 1, Math.floor(y / cell));
+        for (let x = 0; x < size; x++) {
+          const cx = Math.min(FP_GRID - 1, Math.floor(x / cell));
+          const cellIdx = cy * FP_GRID + cx;
+          const pixelIdx = (y * size + x) * 4;
+          sums[cellIdx * 3] += data[pixelIdx];
+          sums[cellIdx * 3 + 1] += data[pixelIdx + 1];
+          sums[cellIdx * 3 + 2] += data[pixelIdx + 2];
+          counts[cellIdx]++;
+        }
       }
-      resolve([Math.round(r / count), Math.round(g / count), Math.round(b / count)]);
+
+      const fingerprint = new Array(cellCount * 3);
+      for (let c = 0; c < cellCount; c++) {
+        const n = counts[c] || 1;
+        fingerprint[c * 3] = Math.round(sums[c * 3] / n);
+        fingerprint[c * 3 + 1] = Math.round(sums[c * 3 + 1] / n);
+        fingerprint[c * 3 + 2] = Math.round(sums[c * 3 + 2] / n);
+      }
+      resolve(fingerprint);
     };
     img.onerror = reject;
     img.src = dataUrl;
   });
 }
 
+// Older data (the built-in reference set, or training photos added before
+// this fix) only has a flat 3-number [r,g,b] fingerprint. Expand it to the
+// current FP_LEN shape by treating it as a uniform-color image, so it can
+// still be compared on equal terms instead of silently corrupting distances.
+function expandFlatColor(rgb) {
+  const out = [];
+  for (let i = 0; i < FP_GRID * FP_GRID; i++) { out.push(rgb[0], rgb[1], rgb[2]); }
+  return out;
+}
+
+function normalizeFingerprint(fp) {
+  if (!fp || !fp.length) return null;
+  if (fp.length === FP_LEN) return fp;
+  if (fp.length === 3) return expandFlatColor(fp);
+  return null; // unrecognized shape — exclude rather than risk a bogus match
+}
+
 function colorDistance(a, b) {
-  return Math.sqrt(
-    Math.pow(a[0] - b[0], 2) +
-    Math.pow(a[1] - b[1], 2) +
-    Math.pow(a[2] - b[2], 2)
-  );
+  const va = normalizeFingerprint(a);
+  const vb = normalizeFingerprint(b);
+  if (!va || !vb) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < va.length; i++) { sum += Math.pow(va[i] - vb[i], 2); }
+  return Math.sqrt(sum);
+}
+
+/* ============================================================
+   2b. DATASET (.zip) UPLOAD — stored in IndexedDB, in-browser only
+   ============================================================ */
+const DB_NAME = "agrishield_db";
+const DB_VERSION = 2;
+const DATASET_STORE = "datasetEntries";
+const META_STORE = "datasetMeta";
+const MAX_ZIP_BYTES = 4 * 1024 * 1024 * 1024;   // 4 GB hard limit on the zip itself
+const MAX_ZIP_IMAGES = 30000;                   // cap for the simple Crop/Disease folder format — raised so a full ~22k-image dataset is used, not sampled
+const PER_CLASS_CAP = Infinity;                 // YOLOv8 format: no per-class cap — every labelled image is used for matching
+const MAX_YOLO_IMAGES = 30000;                  // YOLOv8 format: overall safety ceiling, above any dataset size we expect here
+const THUMB_SIZE = 96;                          // stored preview size, not the original file — trimmed a bit since it's now stored 20k+ times
+const IMAGE_BATCH_SIZE = 12;                    // how many images are decoded/thumbnailed concurrently while building the dataset
+
+let dbPromise = null;
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise(function (resolve, reject) {
+    if (!("indexedDB" in window)) { reject(new Error("IndexedDB unsupported")); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = function (e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DATASET_STORE)) {
+        db.createObjectStore(DATASET_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(META_STORE)) {
+        db.createObjectStore(META_STORE, { keyPath: "key" });
+      }
+    };
+    req.onsuccess = function () { resolve(req.result); };
+    req.onerror = function () { reject(req.error); };
+  });
+  return dbPromise;
+}
+
+function dbSetMeta(value) {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction(META_STORE, "readwrite");
+      tx.objectStore(META_STORE).put({ key: "dataset", value: value });
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = function () { reject(tx.error); };
+    });
+  });
+}
+
+function dbGetMeta() {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction(META_STORE, "readonly");
+      const req = tx.objectStore(META_STORE).get("dataset");
+      req.onsuccess = function () { resolve(req.result ? req.result.value : null); };
+      req.onerror = function () { reject(req.error); };
+    });
+  });
+}
+
+function dbAddEntries(entries) {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction(DATASET_STORE, "readwrite");
+      const store = tx.objectStore(DATASET_STORE);
+      entries.forEach(function (entry) { store.put(entry); });
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = function () { reject(tx.error); };
+    });
+  });
+}
+
+function dbGetAllEntries() {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction(DATASET_STORE, "readonly");
+      const store = tx.objectStore(DATASET_STORE);
+      const req = store.getAll ? store.getAll() : null;
+      if (req) {
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error); };
+      } else {
+        // Fallback for browsers without getAll()
+        const out = [];
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = function (e) {
+          const cursor = e.target.result;
+          if (cursor) { out.push(cursor.value); cursor.continue(); } else { resolve(out); }
+        };
+        cursorReq.onerror = function () { reject(cursorReq.error); };
+      }
+    });
+  });
+}
+
+function dbClearEntries() {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      const tx = db.transaction([DATASET_STORE, META_STORE], "readwrite");
+      tx.objectStore(DATASET_STORE).clear();
+      tx.objectStore(META_STORE).clear();
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = function () { reject(tx.error); };
+    });
+  });
+}
+
+function blobToDataUrl(blob) {
+  return new Promise(function (resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function () { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Downscaled thumbnail so hundreds of dataset images stay cheap to store —
+// the fingerprint (averageColorFromDataUrl) is computed separately, at 40x40.
+function makeThumbnail(dataUrl, size) {
+  return new Promise(function (resolve, reject) {
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function formatBytes(bytes) {
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  return Math.round(bytes / 1024) + " KB";
+}
+
+// Yields to the browser so the progress bar can repaint and the tab stays responsive.
+function nextFrame() {
+  return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+}
+
+// Runs `worker` over `items` in small concurrent batches (not all at once,
+// not fully sequential) so datasets with tens of thousands of entries don't
+// fire thousands of simultaneous zip reads and freeze the tab.
+function runBatched(items, worker, batchSize, onProgress) {
+  const total = items.length;
+  const results = new Array(total);
+  let i = 0;
+  function nextBatch() {
+    if (i >= total) return Promise.resolve(results);
+    const end = Math.min(i + batchSize, total);
+    const slice = items.slice(i, end);
+    return Promise.all(slice.map(function (item, idx) {
+      return worker(item, i + idx).then(function (r) { results[i + idx] = r; }).catch(function () { results[i + idx] = null; });
+    })).then(function () {
+      i = end;
+      if (onProgress) onProgress(i, total);
+      return nextFrame().then(nextBatch);
+    });
+  }
+  return nextBatch();
+}
+
+function renderDatasetSummary() {
+  const summaryEl = document.getElementById("datasetSummary");
+  const clearBtn = document.getElementById("clearDataset");
+  const reportEl = document.getElementById("datasetReport");
+  const formatBadge = document.getElementById("datasetFormatBadge");
+  const preprocBadge = document.getElementById("datasetPreprocBadge");
+  const statList = document.getElementById("datasetStatList");
+  const classTagsEl = document.getElementById("datasetClassTags");
+  if (!summaryEl) return;
+
+  const lang = getStoredLanguage();
+  const dict = translations[lang] || translations.en;
+
+  Promise.all([
+    dbGetAllEntries().catch(function () { return []; }),
+    dbGetMeta().catch(function () { return null; })
+  ]).then(function (results) {
+    const entries = results[0];
+    const meta = results[1];
+
+    // The matching fingerprint format changed (see computeFingerprintFromDataUrl) —
+    // a dataset processed under the old format can't be compared correctly
+    // against new-format entries, so clear it and ask for a re-upload rather
+    // than silently mixing incompatible fingerprints into every diagnosis.
+    if (entries.length && (!meta || meta.fingerprintVersion !== FINGERPRINT_VERSION)) {
+      console.warn("AgriShield: dataset was built with an older fingerprint format — clearing it so it can be re-uploaded and re-processed with the current matching engine.");
+      dbClearEntries().catch(function () { /* ignore */ }).then(function () {
+        summaryEl.textContent = dict["train.dataset.upgraded"] || "The matching engine was upgraded for accuracy — please re-upload your dataset so it's rebuilt with the new fingerprint.";
+        if (clearBtn) clearBtn.hidden = true;
+        if (reportEl) reportEl.hidden = true;
+      });
+      return;
+    }
+
+    if (!entries.length) {
+      summaryEl.textContent = dict["train.dataset.empty"] || "No dataset uploaded yet.";
+      if (clearBtn) clearBtn.hidden = true;
+      if (reportEl) reportEl.hidden = true;
+      return;
+    }
+    const template = dict["train.dataset.summary"] || "{n} images stored in this browser from your uploaded dataset(s).";
+    summaryEl.textContent = template.replace("{n}", entries.length);
+    if (clearBtn) clearBtn.hidden = false;
+
+    if (!reportEl || !meta) { if (reportEl) reportEl.hidden = true; return; }
+
+    reportEl.hidden = false;
+
+    if (formatBadge) {
+      formatBadge.textContent = meta.format === "yolo"
+        ? (dict["train.dataset.formatYolo"] || "YOLOv8 format detected")
+        : (dict["train.dataset.formatFolder"] || "Folder-structured dataset");
+    }
+
+    if (preprocBadge) {
+      if (meta.format === "yolo") {
+        preprocBadge.hidden = false;
+        preprocBadge.textContent = dict["train.dataset.preprocBadge"] || "Auto-oriented · resized 640×640";
+      } else {
+        preprocBadge.hidden = true;
+      }
+    }
+
+    if (statList) {
+      statList.innerHTML = "";
+      const stats = [];
+      if (typeof meta.totalImages === "number") {
+        stats.push([dict["train.dataset.statTotal"] || "Images in dataset", meta.totalImages.toLocaleString()]);
+      }
+      stats.push([dict["train.dataset.statProcessed"] || "Images processed here", meta.added.toLocaleString()]);
+      if (typeof meta.classCount === "number") {
+        stats.push([dict["train.dataset.statClasses"] || "Classes detected", String(meta.classCount)]);
+      }
+      if (meta.sampled) {
+        stats.push([dict["train.dataset.statSampling"] || "Sampling", dict["train.dataset.statSampled"] || "Evenly sampled per class"]);
+      }
+      stats.forEach(function (pair) {
+        const li = document.createElement("li");
+        li.innerHTML = "<strong>" + pair[1] + "</strong> " + pair[0];
+        statList.appendChild(li);
+      });
+    }
+
+    if (classTagsEl) {
+      classTagsEl.innerHTML = "";
+      (meta.classNames || []).slice(0, 24).forEach(function (name) {
+        const span = document.createElement("span");
+        span.className = "dataset-class-tag";
+        span.textContent = name;
+        classTagsEl.appendChild(span);
+      });
+      if ((meta.classNames || []).length > 24) {
+        const span = document.createElement("span");
+        span.className = "dataset-class-tag";
+        span.textContent = "+" + (meta.classNames.length - 24) + " more";
+        classTagsEl.appendChild(span);
+      }
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+   YOLOv8 dataset support (e.g. Roboflow exports): data.yaml +
+   train/valid/test folders, each with images/ and labels/.
+   ------------------------------------------------------------ */
+
+// Very small YAML reader covering the handful of ways `names:` shows up
+// in a YOLOv8 data.yaml — inline list, dashed list, or an index:name map.
+function parseDataYamlNames(text) {
+  const names = [];
+
+  const inlineMatch = text.match(/names\s*:\s*\[([^\]]*)\]/);
+  if (inlineMatch) {
+    inlineMatch[1].split(",").forEach(function (tok) {
+      const cleaned = tok.trim().replace(/^['"]|['"]$/g, "");
+      if (cleaned) names.push(cleaned);
+    });
+    return names;
+  }
+
+  const dictMatch = text.match(/names\s*:\s*\r?\n((?:[ \t]*\d+[ \t]*:.*\r?\n?)+)/);
+  if (dictMatch) {
+    const map = {};
+    dictMatch[1].split(/\r?\n/).forEach(function (line) {
+      const m = line.match(/^[ \t]*(\d+)[ \t]*:[ \t]*(.+?)[ \t]*$/);
+      if (m) map[parseInt(m[1], 10)] = m[2].trim().replace(/^['"]|['"]$/g, "");
+    });
+    const keys = Object.keys(map).map(Number);
+    if (keys.length) {
+      const maxIdx = Math.max.apply(null, keys);
+      for (let i = 0; i <= maxIdx; i++) names[i] = map[i] || ("class_" + i);
+    }
+    return names;
+  }
+
+  const listMatch = text.match(/names\s*:\s*\r?\n((?:[ \t]*-\s*.+\r?\n?)+)/);
+  if (listMatch) {
+    listMatch[1].split(/\r?\n/).forEach(function (line) {
+      const m = line.match(/^[ \t]*-\s*(.+?)[ \t]*$/);
+      if (m) names.push(m[1].trim().replace(/^['"]|['"]$/g, ""));
+    });
+    return names;
+  }
+
+  return names;
+}
+
+function parseDataYamlNc(text) {
+  const m = text.match(/(^|\r?\n)\s*nc\s*:\s*(\d+)/);
+  return m ? parseInt(m[2], 10) : null;
+}
+
+function titleCaseWord(s) {
+  return s.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+}
+
+// Splits a YOLO class name like "Tomato___Late_blight" or "corn-common-rust"
+// into a crop and a disease/issue label for the existing diagnosis UI.
+// Falls back gracefully for single-word / pest-style class names.
+function splitClassName(raw) {
+  const tripleSplit = raw.split(/___+/);
+  if (tripleSplit.length >= 2) {
+    return {
+      crop: titleCaseWord(tripleSplit[0].replace(/[_\-]+/g, " ").trim()) || "Detected class",
+      label: titleCaseWord(tripleSplit.slice(1).join(" ").replace(/[_\-]+/g, " ").trim())
+    };
+  }
+  const cleaned = raw.replace(/[_\-]+/g, " ").trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    return { crop: titleCaseWord(words[0]), label: titleCaseWord(words.slice(1).join(" ")) };
+  }
+  return { crop: "Detected class", label: titleCaseWord(cleaned || raw) };
+}
+
+// Parses a YOLOv8 label .txt: each line is
+// "class_id x_center y_center width height [...]" in normalized 0–1 coords.
+// Returns every box plus the majority class for the image.
+function parseYoloLabelText(text) {
+  const boxes = [];
+  const counts = {};
+  text.split(/\r?\n/).forEach(function (line) {
+    const tok = line.trim().split(/\s+/);
+    if (tok.length < 5) return;
+    const classId = parseInt(tok[0], 10);
+    if (isNaN(classId)) return;
+    counts[classId] = (counts[classId] || 0) + 1;
+    const x = parseFloat(tok[1]), y = parseFloat(tok[2]), w = parseFloat(tok[3]), h = parseFloat(tok[4]);
+    if ([x, y, w, h].every(function (n) { return !isNaN(n); })) {
+      boxes.push({ classId: classId, x: x, y: y, w: w, h: h });
+    }
+  });
+  let majorityClass = null, best = -1;
+  Object.keys(counts).forEach(function (k) {
+    if (counts[k] > best) { best = counts[k]; majorityClass = parseInt(k, 10); }
+  });
+  return { boxes: boxes, majorityClass: majorityClass, count: boxes.length };
+}
+
+// Draws the first box for the majority class onto a thumbnail so the
+// diagnosis preview shows roughly where the detection was made.
+function drawBoxOnDataUrl(dataUrl, box, size) {
+  return new Promise(function (resolve) {
+    if (!box) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement("canvas");
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      const ox = (size - w) / 2, oy = (size - h) / 2;
+      ctx.drawImage(img, ox, oy, w, h);
+      const bx = ox + (box.x - box.w / 2) * w;
+      const by = oy + (box.y - box.h / 2) * h;
+      const bw = box.w * w, bh = box.h * h;
+      ctx.strokeStyle = "#ff5a36";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(bx, by, bw, bh);
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    img.onerror = function () { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+// Scans a JSZip for a YOLOv8 export: a data.yaml plus images/+labels/ pairs
+// under train/valid/test (or any top-level split folder).
+function detectYoloDataset(zip) {
+  let yamlEntry = null;
+  let readmeEntry = null;
+  const imageEntries = [];
+  const labelPaths = {};
+
+  zip.forEach(function (relPath, zipEntry) {
+    if (zipEntry.dir) return;
+    const lower = relPath.toLowerCase();
+    if (/(^|\/)data\.ya?ml$/i.test(relPath) && !yamlEntry) { yamlEntry = zipEntry; return; }
+    if (/(^|\/)readme.*\.txt$/i.test(relPath) && !readmeEntry) { readmeEntry = zipEntry; return; }
+    if (lower.indexOf("__macosx") !== -1) return;
+
+    if (/\/images\/.*\.(jpe?g|png|bmp)$/i.test(relPath)) {
+      imageEntries.push({ path: relPath, zipEntry: zipEntry });
+    } else if (/\/labels\/.*\.txt$/i.test(relPath)) {
+      labelPaths[relPath] = zipEntry;
+    }
+  });
+
+  if (!yamlEntry && imageEntries.length === 0) return null;
+  return { yamlEntry: yamlEntry, readmeEntry: readmeEntry, imageEntries: imageEntries, labelPaths: labelPaths };
+}
+
+// Groups a flat list of {label, ...} items into a balanced sample so a
+// dataset of tens of thousands of images stays responsive in the browser
+// while every class still gets representation.
+function balancedSample(items, perClassCap, totalCap) {
+  const byClass = {};
+  const order = [];
+  items.forEach(function (item) {
+    if (!byClass[item.classKey]) { byClass[item.classKey] = []; order.push(item.classKey); }
+    byClass[item.classKey].push(item);
+  });
+  order.forEach(function (key) {
+    byClass[key] = byClass[key].sort(function () { return Math.random() - 0.5; }).slice(0, perClassCap);
+  });
+  let sampled = [];
+  order.forEach(function (key) { sampled = sampled.concat(byClass[key]); });
+  if (sampled.length > totalCap) {
+    sampled = sampled.sort(function () { return Math.random() - 0.5; }).slice(0, totalCap);
+  }
+  return { sampled: sampled, classCount: order.length };
+}
+
+function processYoloDatasetZip(zip, detection, onProgress) {
+  const yamlEntry = detection.yamlEntry;
+  const readmeEntry = detection.readmeEntry;
+
+  const yamlPromise = yamlEntry ? yamlEntry.async("string") : Promise.resolve("");
+  const readmePromise = readmeEntry ? readmeEntry.async("string") : Promise.resolve("");
+
+  return Promise.all([yamlPromise, readmePromise]).then(function (results) {
+    const yamlText = results[0];
+    const readmeText = results[1];
+    const classNames = parseDataYamlNames(yamlText);
+    const nc = parseDataYamlNc(yamlText);
+
+    // Match each image to its label file: .../images/x.jpg -> .../labels/x.txt
+    const pairs = [];
+    detection.imageEntries.forEach(function (img) {
+      const labelPath = img.path.replace(/\/images\//i, "/labels/").replace(/\.(jpe?g|png|bmp)$/i, ".txt");
+      const labelEntry = detection.labelPaths[labelPath];
+      if (labelEntry) pairs.push({ img: img, labelEntry: labelEntry });
+    });
+
+    if (pairs.length === 0) return Promise.reject(new Error("NO_IMAGES"));
+
+    // Read labels in small concurrent batches (not all ~20k+ at once) so the
+    // tab stays responsive while we figure out each image's class for sampling.
+    if (onProgress) onProgress(0, pairs.length, "labels");
+    return runBatched(pairs, function (p) {
+      return p.labelEntry.async("string").then(function (text) {
+        const parsed = parseYoloLabelText(text);
+        return { pair: p, parsed: parsed };
+      });
+    }, 32, function (done, total) {
+      if (onProgress) onProgress(done, total, "labels");
+    }).then(function (labelled) {
+      const usable = labelled.filter(function (l) { return l && l.parsed.majorityClass !== null; });
+      if (usable.length === 0) return Promise.reject(new Error("NO_IMAGES"));
+
+      const items = usable.map(function (l) {
+        const classId = l.parsed.majorityClass;
+        const rawName = classNames[classId] !== undefined ? classNames[classId] : ("class_" + classId);
+        const split = splitClassName(rawName);
+        return {
+          classKey: rawName,
+          crop: split.crop,
+          label: split.label,
+          pair: l.pair,
+          box: l.parsed.boxes.filter(function (b) { return b.classId === classId; })[0] || null,
+          detections: l.parsed.count
+        };
+      });
+
+      const totalUsable = items.length;
+      const balanced = balancedSample(items, PER_CLASS_CAP, MAX_YOLO_IMAGES);
+      const toProcess = balanced.sampled;
+      const total = toProcess.length;
+      const datasetTag = "yolo-" + Date.now().toString(36);
+
+      // Decode/thumbnail images concurrently in small batches rather than
+      // one-by-one — needed to get through tens of thousands of images in
+      // reasonable time without freezing the tab.
+      return runBatched(toProcess, function (item, idx) {
+        return item.pair.img.zipEntry.async("blob").then(function (blob) {
+          return blobToDataUrl(blob);
+        }).then(function (dataUrl) {
+          return Promise.all([
+            averageColorFromDataUrl(dataUrl),
+            makeThumbnail(dataUrl, THUMB_SIZE).then(function (thumb) {
+              return drawBoxOnDataUrl(thumb, item.box, THUMB_SIZE);
+            })
+          ]);
+        }).then(function (results2) {
+          const color = results2[0], thumb = results2[1];
+          return {
+            id: datasetTag + "-" + idx,
+            crop: item.crop,
+            label: item.label,
+            notes: item.detections > 1
+              ? ("YOLOv8 annotation — " + item.detections + " object(s) detected in this image.")
+              : "YOLOv8 annotation from your uploaded dataset.",
+            img: thumb,
+            color: color,
+            format: "yolo",
+            detections: item.detections
+          };
+        });
+      }, IMAGE_BATCH_SIZE, function (done, totalCount) {
+        if (onProgress) onProgress(done, totalCount, "images");
+      }).then(function (results) {
+        const newEntries = results.filter(Boolean);
+        return dbAddEntries(newEntries).then(function () {
+          return {
+            added: newEntries.length,
+            format: "yolo",
+            classCount: balanced.classCount,
+            classNames: Object.keys(byClassNames(items)),
+            totalImages: totalUsable,
+            sampled: total < totalUsable,
+            readmeText: readmeText,
+            nc: nc,
+            fingerprintVersion: FINGERPRINT_VERSION
+          };
+        });
+      });
+    });
+  });
+}
+
+function byClassNames(items) {
+  const map = {};
+  items.forEach(function (it) { map[it.classKey] = true; });
+  return map;
+}
+
+function parseZipEntries(zip) {
+  const imageEntries = [];
+  const notesByFolder = {};
+  const noteFilePromises = [];
+
+  zip.forEach(function (relPath, zipEntry) {
+    if (zipEntry.dir) return;
+    const parts = relPath.split("/").filter(Boolean);
+    if (parts.length < 2) return; // need at least Crop/photo.jpg
+    const fname = parts[parts.length - 1];
+
+    if (/^notes\.txt$/i.test(fname)) {
+      const folderKey = parts.slice(0, parts.length - 1).join("/");
+      noteFilePromises.push(zipEntry.async("string").then(function (text) {
+        notesByFolder[folderKey] = text.trim();
+      }));
+      return;
+    }
+    if (/\.(jpe?g|png|webp|gif|bmp)$/i.test(fname) && parts.indexOf("__MACOSX") === -1) {
+      imageEntries.push({ parts: parts, zipEntry: zipEntry });
+    }
+  });
+
+  return Promise.all(noteFilePromises).then(function () {
+    return { imageEntries: imageEntries, notesByFolder: notesByFolder };
+  });
+}
+
+function processDatasetZip(file, onProgress) {
+  if (typeof JSZip === "undefined") {
+    return Promise.reject(new Error("JSZip not loaded"));
+  }
+
+  return JSZip.loadAsync(file).then(function (zip) {
+    const yoloDetection = detectYoloDataset(zip);
+    if (yoloDetection && yoloDetection.imageEntries.length > 0 && Object.keys(yoloDetection.labelPaths).length > 0) {
+      return processYoloDatasetZip(zip, yoloDetection, onProgress).then(function (result) {
+        return dbSetMeta(result).then(function () { return result; });
+      });
+    }
+    return processFolderDatasetZip(zip, onProgress);
+  });
+}
+
+function processFolderDatasetZip(zip, onProgress) {
+  return parseZipEntries(zip).then(function (result) {
+    let imageEntries = result.imageEntries;
+    const notesByFolder = result.notesByFolder;
+
+    if (imageEntries.length === 0) {
+      return Promise.reject(new Error("NO_IMAGES"));
+    }
+
+    let truncated = false;
+    if (imageEntries.length > MAX_ZIP_IMAGES) {
+      imageEntries = imageEntries.slice(0, MAX_ZIP_IMAGES);
+      truncated = true;
+    }
+
+    const total = imageEntries.length;
+    const datasetTag = "dataset-" + Date.now().toString(36);
+
+    // Decode/thumbnail images concurrently in small batches (IMAGE_BATCH_SIZE
+    // at a time) rather than one-by-one — with datasets in the tens of
+    // thousands, a purely sequential loop would take far too long.
+    return runBatched(imageEntries, function (item, idx) {
+      const parts = item.parts;
+      const crop = parts[0];
+      const label = parts.length >= 3 ? parts[1] : "Uploaded dataset";
+      const folderKey = parts.slice(0, parts.length - 1).join("/");
+      const notes = notesByFolder[folderKey] || "";
+
+      return item.zipEntry.async("blob").then(function (blob) {
+        return blobToDataUrl(blob);
+      }).then(function (dataUrl) {
+        return Promise.all([averageColorFromDataUrl(dataUrl), makeThumbnail(dataUrl, THUMB_SIZE)]);
+      }).then(function (results) {
+        const color = results[0], thumb = results[1];
+        return {
+          id: datasetTag + "-" + idx,
+          crop: crop,
+          label: label,
+          notes: notes,
+          img: thumb,
+          color: color,
+          format: "folder"
+        };
+      });
+    }, IMAGE_BATCH_SIZE, function (done, totalCount) {
+      if (onProgress) onProgress(done, totalCount);
+    }).then(function (results) {
+      const newEntries = results.filter(Boolean);
+      return dbAddEntries(newEntries).then(function () {
+        const classNames = {};
+        newEntries.forEach(function (e) { classNames[e.crop + " — " + e.label] = true; });
+        const res = { added: newEntries.length, truncated: truncated };
+        return dbSetMeta({
+          added: res.added,
+          format: "folder",
+          classCount: Object.keys(classNames).length,
+          classNames: Object.keys(classNames),
+          totalImages: imageEntries.length,
+          sampled: res.truncated,
+          readmeText: "",
+          nc: null,
+          fingerprintVersion: FINGERPRINT_VERSION
+        }).then(function () { return res; });
+      });
+    });
+  });
+}
+
+function initDatasetForm() {
+  const form = document.getElementById("datasetForm");
+  if (!form) return;
+
+  const fileInput = document.getElementById("datasetZip");
+  const msg = document.getElementById("datasetMsg");
+  const progressWrap = document.getElementById("datasetProgressWrap");
+  const progressBar = document.getElementById("datasetProgressBar");
+  const progressLabel = document.getElementById("datasetProgressLabel");
+  const submitBtn = form.querySelector("button[type=submit]");
+
+  function dict() {
+    const lang = getStoredLanguage();
+    return translations[lang] || translations.en;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const d = dict();
+
+    if (!/\.zip$/i.test(file.name)) {
+      msg.textContent = d["train.dataset.notZip"] || "Please choose a .zip file.";
+      return;
+    }
+    if (file.size > MAX_ZIP_BYTES) {
+      msg.textContent = d["train.dataset.tooLarge"] || "That file is too large — the limit for a dataset upload is 2 GB.";
+      return;
+    }
+
+    msg.textContent = "";
+    submitBtn.disabled = true;
+    progressWrap.hidden = false;
+    progressBar.style.width = "0%";
+    progressLabel.textContent = d["train.dataset.reading"] || "Reading zip file…";
+
+    processDatasetZip(file, function (done, total, phase) {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      progressBar.style.width = pct + "%";
+      if (phase === "labels") {
+        const template = d["train.dataset.readingLabels"] || "Reading labels: {n} / {t}";
+        progressLabel.textContent = template.replace("{n}", done).replace("{t}", total);
+      } else {
+        progressLabel.textContent = done + " / " + total;
+      }
+    }).then(function (result) {
+      let text;
+      if (result.format === "yolo") {
+        const yoloTemplate = d["train.dataset.doneYolo"] || "Processed {n} images across {c} classes from your YOLOv8 dataset.";
+        text = yoloTemplate.replace("{n}", result.added).replace("{c}", result.classCount);
+        if (result.sampled) {
+          const sampleTemplate = d["train.dataset.sampledNote"] || " Your dataset had {t} images — an even sample per class was used to keep the browser responsive.";
+          text += sampleTemplate.replace("{t}", result.totalImages);
+        }
+      } else {
+        const doneTemplate = d["train.dataset.done"] || "Added {n} images from your dataset.";
+        text = doneTemplate.replace("{n}", result.added);
+        if (result.truncated) {
+          const truncTemplate = d["train.dataset.truncated"] || "Only the first {n} images from this zip were used, to keep the browser responsive.";
+          text += " " + truncTemplate.replace("{n}", MAX_ZIP_IMAGES);
+        }
+      }
+      msg.textContent = text;
+      form.reset();
+      renderDatasetSummary();
+    }).catch(function (err) {
+      if (err && err.message === "NO_IMAGES") {
+        msg.textContent = d["train.dataset.noImages"] || "No images found in that zip. Use Crop/Disease/photo.jpg, or a YOLOv8 export with data.yaml plus images/ and labels/ folders.";
+      } else if (err && err.message === "JSZip not loaded") {
+        msg.textContent = d["train.dataset.libFail"] || "Could not load the zip reader — check your connection and try again.";
+      } else {
+        msg.textContent = d["train.dataset.libFail"] || "Could not read that zip file — please try again.";
+      }
+    }).then(function () {
+      submitBtn.disabled = false;
+      progressWrap.hidden = true;
+    });
+  });
+
+  const clearBtn = document.getElementById("clearDataset");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      dbClearEntries().then(function () {
+        renderDatasetSummary();
+        const d = dict();
+        msg.textContent = d["train.dataset.removed"] || "Uploaded dataset removed.";
+      });
+    });
+  }
 }
 
 function renderTrainingList() {
@@ -583,6 +1447,9 @@ function initTrainForm() {
     resetBtn.addEventListener("click", function () {
       saveTrainingData([]);
       renderTrainingList();
+      dbClearEntries().catch(function () { /* ignore */ }).then(function () {
+        renderDatasetSummary();
+      });
       const lang = getStoredLanguage();
       const dict = translations[lang] || translations.en;
       if (msg) msg.textContent = dict["train.cleared"] || "Training data cleared.";
@@ -602,10 +1469,19 @@ function initDiagnoseForm() {
 
     readFileAsDataUrl(file).then(function (dataUrl) {
       return averageColorFromDataUrl(dataUrl).then(function (color) {
+        return dbGetAllEntries().catch(function (err) {
+          // Surface this instead of swallowing it — a silent failure here
+          // used to mean diagnosis quietly fell back to just the 7 built-in
+          // reference entries, no matter how large the uploaded dataset was.
+          console.error("AgriShield: could not read the uploaded dataset from IndexedDB — diagnosis will fall back to the built-in reference set only.", err);
+          return [];
+        }).then(function (datasetData) {
         const userData = loadTrainingData();
         const candidates = userData.map(function (e) {
           return { crop: e.crop, label: e.label, notes: e.notes, color: e.color, source: "user" };
-        }).concat(BUILTIN_DATA.map(function (e) {
+        }).concat(datasetData.map(function (e) {
+          return { crop: e.crop, label: e.label, notes: e.notes, color: e.color, source: "dataset", format: e.format, detections: e.detections };
+        })).concat(BUILTIN_DATA.map(function (e) {
           return { crop: e.crop, label: e.label, notes: e.notes, color: e.color, source: "builtin" };
         }));
 
@@ -616,10 +1492,20 @@ function initDiagnoseForm() {
           if (d < bestDist) { bestDist = d; best = c; }
         });
 
+        // Visible in the browser console (F12 → Console) so this can be
+        // checked directly: how many candidates this diagnosis actually
+        // compared against, and which one it picked.
+        console.log(
+          "AgriShield diagnosis: compared against " + candidates.length + " images " +
+          "(" + userData.length + " single training photos, " + datasetData.length + " from uploaded dataset, " +
+          BUILTIN_DATA.length + " built-in). Closest match: " +
+          (best ? best.crop + " — " + best.label + " (source: " + best.source + ", distance: " + Math.round(bestDist) + ")" : "none")
+        );
+
         if (!best) return;
 
         // Rough, deliberately conservative confidence score for this demo.
-        const maxDist = 441.7; // sqrt(255^2 * 3)
+        const maxDist = 255 * Math.sqrt(FP_LEN); // theoretical max distance for an FP_LEN-dim fingerprint
         let confidence = Math.round(100 - (bestDist / maxDist) * 100);
         confidence = Math.max(38, Math.min(confidence, 96));
 
@@ -633,19 +1519,35 @@ function initDiagnoseForm() {
         const source = document.getElementById("diagnoseSource");
         const preview = document.getElementById("diagnosePreview");
         const dot = document.getElementById("diagnoseDot");
+        const detectionsEl = document.getElementById("diagnoseDetections");
 
         title.textContent = best.crop + " — " + best.label;
         conf.textContent = (dict["diagnose.confidence"] || "Confidence") + ": " + confidence + "%";
         note.textContent = (dict["diagnose.notesLabel"] || "Suggested next step") + ": " + (best.notes || "—");
         source.textContent = best.source === "user"
           ? (dict["diagnose.source.user"] || "Matched against a photo you added to the training set.")
+          : best.source === "dataset"
+          ? (best.format === "yolo"
+              ? (dict["diagnose.source.yolo"] || "Matched against a YOLOv8-annotated image from your uploaded dataset.")
+              : (dict["diagnose.source.dataset"] || "Matched against an image from your uploaded dataset."))
           : (dict["diagnose.source.builtin"] || "Matched against the built-in reference set.");
         preview.src = dataUrl;
         preview.alt = best.crop + " photo submitted for diagnosis";
         dot.className = "dot " + (confidence >= 70 ? "dot-good" : "dot-warn");
 
+        if (detectionsEl) {
+          if (best.format === "yolo" && best.detections) {
+            const template = dict["diagnose.detectionsCount"] || "{n} object(s) were annotated on the closest matching training image.";
+            detectionsEl.textContent = template.replace("{n}", best.detections);
+            detectionsEl.hidden = false;
+          } else {
+            detectionsEl.hidden = true;
+          }
+        }
+
         resultBox.hidden = false;
         resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }); // dbGetAllEntries
       });
     }).catch(function () {
       /* silently ignore unreadable files */
@@ -669,6 +1571,7 @@ document.addEventListener('DOMContentLoaded', function () {
     langSelect.addEventListener('change', function () {
       applyLanguage(langSelect.value);
       renderTrainingList(); // refresh "Remove" button label etc.
+      renderDatasetSummary();
     });
   }
 
@@ -677,26 +1580,27 @@ document.addEventListener('DOMContentLoaded', function () {
   var nav = document.getElementById('mainNav');
 
   if (toggle && nav) {
-    toggle.addEventListener('click', function () 
-    {
+    toggle.addEventListener('click', function () {
       var isOpen = nav.classList.toggle('is-open');
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     });
 
-    nav.querySelectorAll('a').forEach(function (link) 
-    {
-      link.addEventListener('click', function () 
-      {
+    nav.querySelectorAll('a').forEach(function (link) {
+      link.addEventListener('click', function () {
         nav.classList.remove('is-open');
         toggle.setAttribute('aria-expanded', 'false');
       });
     });
   }
 
+  // Train / diagnose demo
   renderTrainingList();
   initTrainForm();
   initDiagnoseForm();
+  initDatasetForm();
+  renderDatasetSummary();
 
+  // Single, restrained reveal-on-scroll for major section blocks
   var revealTargets = document.querySelectorAll(
     '.section-head, .step, .data-card, .stakeholder-card, .diagnosis-copy, .diagnosis-media, .hero-copy, .hero-media, .perf-card, .train-panel'
   );

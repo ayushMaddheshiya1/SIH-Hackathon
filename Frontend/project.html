@@ -277,9 +277,53 @@
             <h3 data-i18n="train.list.title">Your training set</h3>
             <button type="button" id="resetTraining" class="btn btn-outline btn-sm" data-i18n="train.list.reset">Clear all my training data</button>
           </div>
+          <p class="dataset-note" data-i18n="train.list.resetNote">This clears both single photos added above and any uploaded dataset.</p>
           <ul id="trainList" class="train-list"></ul>
           <p class="train-empty" id="trainEmpty" data-i18n="train.list.empty">No training images yet — add some
              above, or just try a diagnosis using the built-in reference set.</p>
+
+          <div class="form-divider" role="separator"><span data-i18n="train.dataset.or">or</span></div>
+
+          <div class="dataset-block">
+            <h3 data-i18n="train.dataset.heading">Upload a full training dataset (.zip)</h3>
+            <p class="dataset-hint" data-i18n="train.dataset.hint">Two zip formats are supported and detected
+               automatically. YOLOv8 / Roboflow export: a data.yaml file plus train/valid/test folders, each with
+               an images/ and labels/ subfolder of matching .txt annotations — images already auto-oriented
+               (EXIF stripped) and resized to 640×640 are read natively. Simple folder export: zip it as
+               Crop/Disease/photo.jpg — one top-level folder per crop, a subfolder per disease, images inside,
+               with an optional notes.txt per disease folder for treatment notes.</p>
+
+            <form id="datasetForm" class="train-form">
+              <label for="datasetZip" data-i18n="train.dataset.label">Dataset .zip file</label>
+              <input type="file" id="datasetZip" accept=".zip,application/zip,application/x-zip-compressed" required />
+              <p class="dataset-limit" data-i18n="train.dataset.limit">Max file size 2 GB. Everything is unzipped,
+                 parsed and diagnosed right here in your browser — the file is never uploaded to a server. Large
+                 datasets are sampled evenly across classes to keep the browser responsive.</p>
+              <button type="submit" class="btn btn-primary" data-i18n="train.dataset.submit">Upload dataset</button>
+              <p class="form-note" id="datasetMsg" role="status"></p>
+            </form>
+
+            <div class="dataset-progress" id="datasetProgressWrap" hidden>
+              <div class="dataset-progress-track">
+                <div class="dataset-progress-bar" id="datasetProgressBar"></div>
+              </div>
+              <p class="dataset-progress-label" id="datasetProgressLabel"></p>
+            </div>
+
+            <div class="dataset-report" id="datasetReport" hidden>
+              <div class="dataset-report-row">
+                <span class="dataset-format-badge" id="datasetFormatBadge"></span>
+                <span class="dataset-preproc-badge" id="datasetPreprocBadge" hidden></span>
+              </div>
+              <ul class="dataset-stat-list" id="datasetStatList"></ul>
+              <div class="dataset-class-tags" id="datasetClassTags"></div>
+            </div>
+
+            <div class="dataset-summary-row">
+              <p class="dataset-summary" id="datasetSummary"></p>
+              <button type="button" id="clearDataset" class="btn btn-outline btn-sm" hidden data-i18n="train.dataset.clear">Remove uploaded dataset</button>
+            </div>
+          </div>
         </div>
 
         <!-- DIAGNOSE PANEL -->
@@ -302,10 +346,12 @@
             <img id="diagnosePreview" class="diagnose-preview" alt="" />
             <p class="result-note" id="diagnoseNote"></p>
             <p class="diagnose-source" id="diagnoseSource"></p>
+            <p class="diagnose-detections" id="diagnoseDetections" hidden></p>
           </div>
 
           <p class="disclaimer" data-i18n="diagnose.disclaimer">This in-browser demo matches photos by visual
-             similarity to show how the train-then-diagnose flow works. A production AgriShield deployment would
+             similarity — against your single training photos, your uploaded dataset, and the built-in reference
+             set — to show how the train-then-diagnose flow works. A production AgriShield deployment would
              replace this step with a proper vision model trained on verified field data.</p>
         </div>
       </div>
@@ -432,6 +478,7 @@
   </div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
