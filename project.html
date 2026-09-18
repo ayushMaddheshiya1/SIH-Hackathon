@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgriShield — AI Crop Diagnosis &amp; Advisory Platform for Maharashtra</title>
+<meta name="description" content="AgriShield brings crop diagnosis, expert advice and government-level insight together in one platform built for farmers, extension workers and policy makers across Maharashtra." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main" data-i18n="a11y.skip">Skip to content</a>
+
+<header class="site-header" id="siteHeader">
+  <div class="wrap header-row">
+    <a href="#top" class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="30" height="30">
+          <path d="M16 3C10 8 6 13 6 19a10 10 0 0 0 20 0c0-6-4-11-10-16Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M16 11v15M16 15c-2.5-2-5-2.5-7-2M16 19c2.7-2.2 5.4-2.7 7.5-2.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Agri<em>Shield</em></span>
+    </a>
+
+    <nav class="main-nav" id="mainNav" aria-label="Primary">
+      <a href="#how-it-works" data-i18n="nav.how">How it works</a>
+      <a href="#data-sources" data-i18n="nav.data">Data sources</a>
+      <a href="#diagnosis" data-i18n="nav.diagnosis">Diagnosis</a>
+      <a href="#train" data-i18n="nav.train">Try it</a>
+      <a href="#stakeholders" data-i18n="nav.who">Who it's for</a>
+      <a href="#contact" data-i18n="nav.contact">Contact</a>
+    </nav>
+
+    <div class="header-actions">
+      <div class="lang-switch">
+        <label for="langSelect" class="sr-only" data-i18n="a11y.language">Language</label>
+        <select id="langSelect" aria-label="Choose language">
+          <option value="en">English</option>
+          <option value="hi">हिंदी</option>
+          <option value="mr">मराठी</option>
+        </select>
+      </div>
+      <a href="#train" class="btn btn-primary" data-i18n="header.cta">Try it now</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mainNav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow-plain" data-i18n="hero.eyebrow">Built for Maharashtra's farms</p>
+        <h1 data-i18n="hero.h1">Know what's wrong with your crop before it costs you the season.</h1>
+        <p class="hero-lede" data-i18n="hero.lede">
+          AgriShield reads photos of cotton, sugarcane, soybean, grapes and other Maharashtra crops
+          alongside local weather, soil and pest data, then turns them into a diagnosis a farmer can
+          act on the same day — with a human expert never more than a message away.
+        </p>
+        <div class="hero-actions">
+          <a href="#train" class="btn btn-primary btn-lg" data-i18n="hero.btnPrimary">Try a diagnosis</a>
+          <a href="#how-it-works" class="btn btn-outline btn-lg" data-i18n="hero.btnOutline">See how it works</a>
+        </div>
+        <ul class="hero-trust">
+          <li data-i18n="hero.trust1">Made for farmers, extension workers and government teams in Maharashtra</li>
+          <li data-i18n="hero.trust2">Available in English, Hindi and Marathi</li>
+        </ul>
+      </div>
+      <div class="hero-media">
+        <img src="https://images.unsplash.com/photo-1765260905999-06612390fb07?fm=jpg&q=80&w=1400&auto=format&fit=crop"
+             alt="Green cultivated fields on rolling hills under a clear sky" loading="eager" />
+        <div class="hero-floating-card">
+          <span class="dot dot-good" aria-hidden="true"></span>
+          <div>
+            <strong data-i18n="hero.floating.title">Leaf blight detected</strong>
+            <span data-i18n="hero.floating.sub">92% confidence · treatment ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODEL PERFORMANCE -->
+  <section class="section performance">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 data-i18n="perf.h2">Model performance you can plan around</h2>
+        <p data-i18n="perf.sub">These are the expected ranges for the current AgriShield model, built and
+           tuned on crop imagery and field reports from across Maharashtra.</p>
+      </div>
+      <div class="perf-grid">
+        <div class="perf-card perf-green">
+          <span class="perf-value">85–93%</span>
+          <span class="perf-label" data-i18n="perf.card1">Disease Detection Accuracy</span>
+        </div>
+        <div class="perf-card perf-purple">
+          <span class="perf-value">80–90%</span>
+          <span class="perf-label" data-i18n="perf.card2">Risk Forecasting Accuracy</span>
+        </div>
+        <div class="perf-card perf-blue">
+          <span class="perf-value">75–88%</span>
+          <span class="perf-label" data-i18n="perf.card3">Hotspot Mapping Precision</span>
+        </div>
+        <div class="perf-card perf-orange">
+          <span class="perf-value">&lt; 5 min</span>
+          <span class="perf-label" data-i18n="perf.card4">Response Time from image upload</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 data-i18n="how.h2">From a photo to a plan, in four steps</h2>
+        <p data-i18n="how.sub">The same pipeline runs whether the request comes from a phone in a Vidarbha
+           cotton field or a district office dashboard in Pune.</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <img class="step-media" src="https://images.unsplash.com/photo-1633410195091-bd66114cef5f?fm=jpg&q=80&w=700&auto=format&fit=crop" alt="Farmer photographing a crop in a green field" loading="lazy" />
+          <span class="step-index">1</span>
+          <h3 data-i18n="step1.title">Capture</h3>
+          <p data-i18n="step1.desc">A farmer photographs the affected crop, or a sensor logs an unusual reading — no
+             special equipment required.</p>
+        </li>
+        <li class="step">
+          <img class="step-media" src="https://images.unsplash.com/photo-1741595178836-2be9d51ca891?fm=jpg&q=80&w=700&auto=format&fit=crop" alt="Cloudy sky over green farmland" loading="lazy" />
+          <span class="step-index">2</span>
+          <h3 data-i18n="step2.title">Combine</h3>
+          <p data-i18n="step2.desc">The image is checked against local weather, soil, location and known
+             outbreaks nearby, not looked at alone.</p>
+        </li>
+        <li class="step">
+          <img class="step-media" src="https://images.unsplash.com/photo-1602332659518-1e068472e7ab?fm=jpg&q=80&w=700&auto=format&fit=crop" alt="Close-up of a leaf showing disease symptoms" loading="lazy" />
+          <span class="step-index">3</span>
+          <h3 data-i18n="step3.title">Diagnose</h3>
+          <p data-i18n="step3.desc">A model trained on Maharashtra's crop diseases returns a likely cause
+             with a confidence score and a suggested treatment.</p>
+        </li>
+        <li class="step">
+          <img class="step-media" src="https://images.unsplash.com/photo-1434626881859-194d67b2b86f?fm=jpg&q=80&w=700&auto=format&fit=crop" alt="Field worker reviewing crop data on a tablet" loading="lazy" />
+          <span class="step-index">4</span>
+          <h3 data-i18n="step4.title">Confirm &amp; act</h3>
+          <p data-i18n="step4.desc">An extension worker can validate the result in unclear cases before it
+             reaches the farmer as a plain-language alert.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- DATA SOURCES -->
+  <section class="section" id="data-sources">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 data-i18n="data.h2">Six sources feed every diagnosis</h2>
+        <p data-i18n="data.sub">A single photo rarely tells the whole story. AgriShield brings the
+           surrounding context in automatically.</p>
+      </div>
+
+      <div class="card-grid">
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1742161261695-922c22274e5b?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Aerial drone view of rows of a cultivated field" loading="lazy" />
+          <h3 data-i18n="card1.title">Crop images</h3>
+          <p data-i18n="card1.desc">Photos from a phone, a field camera, or an optional drone pass over the plot.</p>
+        </div>
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1700977932014-85ab5db62b5b?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Close-up of an insect on a crop leaf" loading="lazy" />
+          <h3 data-i18n="card2.title">Pest traps &amp; sensors</h3>
+          <p data-i18n="card2.desc">Pheromone traps, soil and humidity sensors, and notes a worker logs by hand.</p>
+        </div>
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1741595178836-2be9d51ca891?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Sky and clouds over a Maharashtra field" loading="lazy" />
+          <h3 data-i18n="card3.title">Weather</h3>
+          <p data-i18n="card3.desc">Temperature, humidity, rainfall and a short-range forecast for the exact plot.</p>
+        </div>
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Dashboard interface showing regional map data" loading="lazy" />
+          <h3 data-i18n="card4.title">Location &amp; land</h3>
+          <p data-i18n="card4.desc">GPS position, land use, and district-level disease history recorded over time.</p>
+        </div>
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1602332659518-1e068472e7ab?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Close-up of a crop leaf" loading="lazy" />
+          <h3 data-i18n="card5.title">Crop &amp; farm details</h3>
+          <p data-i18n="card5.desc">Crop type, growth stage, soil condition and the plot's own pest history.</p>
+        </div>
+        <div class="data-card">
+          <img class="data-media" src="https://images.unsplash.com/photo-1705052578191-354e72595b27?fm=jpg&q=80&w=600&auto=format&fit=crop" alt="Golden wheat field, representing agronomy reference material" loading="lazy" />
+          <h3 data-i18n="card6.title">Expert knowledge base</h3>
+          <p data-i18n="card6.desc">A reference library of diseases, agronomy practice and Maharashtra Krishi Vibhag advisories.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIAGNOSIS SHOWCASE -->
+  <section class="section section-alt diagnosis" id="diagnosis">
+    <div class="wrap diagnosis-grid">
+      <div class="diagnosis-media">
+        <img src="https://images.unsplash.com/photo-1602332659518-1e068472e7ab?fm=jpg&q=80&w=1200&auto=format&fit=crop"
+             alt="Close-up of a grapevine leaf showing early disease symptoms" loading="lazy" />
+      </div>
+      <div class="diagnosis-copy">
+        <p class="eyebrow-plain" data-i18n="diagnosis.eyebrow">What the farmer sees</p>
+        <h2 data-i18n="diagnosis.h2">A result written for the field, not for a lab report</h2>
+        <p data-i18n="diagnosis.p">Every diagnosis comes back as a short, plain-language card: what the problem
+           likely is, how confident the system is, and what to do about it today.</p>
+
+        <div class="result-card">
+          <div class="result-top">
+            <span class="dot dot-warn" aria-hidden="true"></span>
+            <div>
+              <strong data-i18n="diagnosis.result.title">Downy mildew — grapevine</strong>
+              <span data-i18n="diagnosis.result.conf">Confidence: 88%</span>
+            </div>
+          </div>
+          <p class="result-note" data-i18n="diagnosis.result.note">Yellow patches on the upper leaf surface,
+             consistent with the humid spell reported around Nashik this week.</p>
+          <div class="result-actions">
+            <span class="pill" data-i18n="diagnosis.pill1">Remove affected leaves</span>
+            <span class="pill" data-i18n="diagnosis.pill2">Apply a copper-based spray</span>
+            <span class="pill" data-i18n="diagnosis.pill3">Re-check in 5 days</span>
+          </div>
+        </div>
+
+        <p class="diagnosis-footnote" data-i18n="diagnosis.footnote">Unclear cases are automatically routed to
+           an extension worker for a second opinion before any advice reaches the farmer.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRAIN & DIAGNOSE -->
+  <section class="section train-section" id="train">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow-plain" data-i18n="train.eyebrow">Try it yourself</p>
+        <h2 data-i18n="train.h2">Add your own crop photos, then run a diagnosis</h2>
+        <p data-i18n="train.sub">Upload a few labelled photos of a crop problem you already know, and AgriShield
+           will use them the next time you diagnose a similar-looking photo. Without any of your own data, it
+           falls back to a small built-in reference set for common Maharashtra crop issues.</p>
+      </div>
+
+      <div class="train-grid">
+        <!-- TRAINING PANEL -->
+        <div class="train-panel">
+          <h3 data-i18n="train.form.heading">Add a training photo</h3>
+          <form id="trainForm" class="train-form">
+            <label for="trainCrop" data-i18n="train.form.crop">Crop</label>
+            <input type="text" id="trainCrop" placeholder="e.g. Cotton, Sugarcane, Grapes" data-i18n-placeholder="train.form.cropPh" required />
+
+            <label for="trainLabel" data-i18n="train.form.disease">Disease / issue name</label>
+            <input type="text" id="trainLabel" placeholder="e.g. Pink bollworm damage" data-i18n-placeholder="train.form.diseasePh" required />
+
+            <label for="trainNotes" data-i18n="train.form.notes">Treatment notes (optional)</label>
+            <textarea id="trainNotes" rows="2" placeholder="What worked for this problem?" data-i18n-placeholder="train.form.notesPh"></textarea>
+
+            <label for="trainImage" data-i18n="train.form.image">Photo</label>
+            <input type="file" id="trainImage" accept="image/*" required />
+
+            <button type="submit" class="btn btn-primary" data-i18n="train.form.submit">Add to training set</button>
+            <p class="form-note" id="trainMsg" role="status"></p>
+          </form>
+
+          <div class="train-list-head">
+            <h3 data-i18n="train.list.title">Your training set</h3>
+            <button type="button" id="resetTraining" class="btn btn-outline btn-sm" data-i18n="train.list.reset">Clear all my training data</button>
+          </div>
+          <ul id="trainList" class="train-list"></ul>
+          <p class="train-empty" id="trainEmpty" data-i18n="train.list.empty">No training images yet — add some
+             above, or just try a diagnosis using the built-in reference set.</p>
+        </div>
+
+        <!-- DIAGNOSE PANEL -->
+        <div class="train-panel diagnose-panel">
+          <h3 data-i18n="diagnose.heading">Diagnose a crop photo</h3>
+          <form id="diagnoseForm" class="train-form">
+            <label for="diagnoseImage" data-i18n="diagnose.form.image">Photo to diagnose</label>
+            <input type="file" id="diagnoseImage" accept="image/*" required />
+            <button type="submit" class="btn btn-primary" data-i18n="diagnose.form.submit">Run diagnosis</button>
+          </form>
+
+          <div id="diagnoseResult" class="diagnose-result" hidden>
+            <div class="result-top">
+              <span class="dot" id="diagnoseDot" aria-hidden="true"></span>
+              <div>
+                <strong id="diagnoseTitle"></strong>
+                <span id="diagnoseConfidence"></span>
+              </div>
+            </div>
+            <img id="diagnosePreview" class="diagnose-preview" alt="" />
+            <p class="result-note" id="diagnoseNote"></p>
+            <p class="diagnose-source" id="diagnoseSource"></p>
+          </div>
+
+          <p class="disclaimer" data-i18n="diagnose.disclaimer">This in-browser demo matches photos by visual
+             similarity to show how the train-then-diagnose flow works. A production AgriShield deployment would
+             replace this step with a proper vision model trained on verified field data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAKEHOLDERS -->
+  <section class="section section-alt" id="stakeholders">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 data-i18n="stake.h2">One platform, three very different days</h2>
+        <p data-i18n="stake.sub">The same data moves through interfaces built for the person using it — a
+           field in Vidarbha, a clipboard in Marathwada, or a district map in Mantralaya.</p>
+      </div>
+
+      <div class="stakeholder-grid">
+        <article class="stakeholder-card">
+          <img src="https://images.unsplash.com/photo-1633410195091-bd66114cef5f?fm=jpg&q=80&w=900&auto=format&fit=crop"
+               alt="Farmers working together in a green field" loading="lazy" />
+          <div class="stakeholder-body">
+            <h3 data-i18n="stake1.title">Farmer</h3>
+            <p data-i18n="stake1.desc">Upload a photo, get a diagnosis, and keep a running record of crop health
+               across every season.</p>
+            <ul>
+              <li data-i18n="stake1.li1">Upload an image or a short report</li>
+              <li data-i18n="stake1.li2">View diagnosis and treatment advice</li>
+              <li data-i18n="stake1.li3">Get alerts before an outbreak spreads nearby</li>
+              <li data-i18n="stake1.li4">Track crop health over time</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="stakeholder-card">
+          <img src="https://images.unsplash.com/photo-1434626881859-194d67b2b86f?fm=jpg&q=80&w=900&auto=format&fit=crop"
+               alt="Field worker holding a tablet while reviewing crop data" loading="lazy" />
+          <div class="stakeholder-body">
+            <h3 data-i18n="stake2.title">Extension worker</h3>
+            <p data-i18n="stake2.desc">Step in exactly where the model is unsure, and keep every field visit on
+               record for your taluka.</p>
+            <ul>
+              <li data-i18n="stake2.li1">Review field reports from nearby farms</li>
+              <li data-i18n="stake2.li2">Confirm or correct uncertain diagnoses</li>
+              <li data-i18n="stake2.li3">Send verified advice back to farmers</li>
+              <li data-i18n="stake2.li4">See alerts across the whole taluka</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="stakeholder-card">
+          <img src="https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?fm=jpg&q=80&w=900&auto=format&fit=crop"
+               alt="Dashboard interface showing regional data on a screen" loading="lazy" />
+          <div class="stakeholder-body">
+            <h3 data-i18n="stake3.title">Government</h3>
+            <p data-i18n="stake3.desc">See outbreak patterns forming at district or division level across
+               Maharashtra while there's still time to respond.</p>
+            <ul>
+              <li data-i18n="stake3.li1">District and division-level disease maps</li>
+              <li data-i18n="stake3.li2">Reports and trend analytics</li>
+              <li data-i18n="stake3.li3">Resource allocation planning</li>
+              <li data-i18n="stake3.li4">Policy and advisory planning support</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIMPLE, ACCESSIBLE -->
+  <section class="section availability">
+    <div class="wrap availability-row">
+      <div>
+        <h2 data-i18n="avail.h2">A simple website — nothing to install</h2>
+        <p data-i18n="avail.p">AgriShield runs in the browser, works on any screen size, and speaks the
+           languages Maharashtra's farms already speak.</p>
+      </div>
+      <ul class="availability-list">
+        <li data-i18n="avail.item1">Works on any phone or computer browser</li>
+        <li data-i18n="avail.item2">English, Hindi and Marathi</li>
+        <li data-i18n="avail.item3">Built around Maharashtra's major crops</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- CTA BANNER -->
+  <section class="cta-banner">
+    <img src="https://images.unsplash.com/photo-1705052578191-354e72595b27?fm=jpg&q=80&w=1600&auto=format&fit=crop"
+         alt="Golden wheat field under a bright blue sky" class="cta-bg" loading="lazy" />
+    <div class="cta-overlay"></div>
+    <div class="wrap cta-content">
+      <h2 data-i18n="cta.h2">See it work on your own crop photo.</h2>
+      <p data-i18n="cta.p">Add a training image or two, then try a real diagnosis — right here in the browser.</p>
+      <a href="#train" class="btn btn-primary btn-lg" data-i18n="cta.btn">Try the demo</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" id="contact">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <span class="brand-name light">Agri<em>Shield</em></span>
+      <p data-i18n="footer.about">An AI-assisted crop diagnosis and advisory platform connecting farmers,
+         extension workers and government teams across Maharashtra.</p>
+    </div>
+
+    <div class="footer-col">
+      <h4 data-i18n="footer.platform">Platform</h4>
+      <a href="#how-it-works" data-i18n="nav.how">How it works</a>
+      <a href="#data-sources" data-i18n="nav.data">Data sources</a>
+      <a href="#diagnosis" data-i18n="nav.diagnosis">Diagnosis</a>
+      <a href="#train" data-i18n="nav.train">Try it</a>
+    </div>
+
+    <div class="footer-col">
+      <h4 data-i18n="footer.contact">Get in touch</h4>
+      <a href="mailto:hello@agrishield.example">hello@agrishield.example</a>
+      <a href="tel:+911234567890">+91 12345 67890</a>
+      <p class="footer-note" data-i18n="footer.location">Maharashtra, India</p>
+    </div>
+  </div>
+
+  <div class="wrap footer-bottom">
+    <p><span data-i18n="footer.copyright">&copy;</span> <span id="year"></span> AgriShield. <span data-i18n="footer.student">Built as a student project.</span></p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
